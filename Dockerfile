@@ -5,7 +5,7 @@ FROM node:22.22.0-bookworm-slim AS build
 ENV CI=true
 WORKDIR /app
 
-RUN corepack enable
+RUN corepack enable && corepack install --global pnpm@10.33.0
 
 COPY package.json ./package.json
 COPY web/package.json web/pnpm-lock.yaml web/.npmrc ./web/
@@ -27,13 +27,18 @@ ENV NODE_ENV=production \
     PORT=3000
 
 WORKDIR /app
-RUN corepack enable
+RUN corepack enable && corepack install --global pnpm@10.33.0
 
 COPY package.json ./package.json
 COPY --from=build --chown=node:node /app/web/package.json ./web/package.json
 COPY --from=build --chown=node:node /app/web/pnpm-lock.yaml ./web/pnpm-lock.yaml
 COPY --from=build --chown=node:node /app/web/node_modules ./web/node_modules
 COPY --from=build --chown=node:node /app/web/dist ./web/dist
+COPY --from=build --chown=node:node /app/web/db ./web/db
+COPY --from=build --chown=node:node /app/web/lib ./web/lib
+COPY --from=build --chown=node:node /app/web/drizzle ./web/drizzle
+COPY --from=build --chown=node:node /app/web/drizzle.config.ts ./web/drizzle.config.ts
+COPY --from=build --chown=node:node /app/web/tsconfig.json ./web/tsconfig.json
 
 WORKDIR /app/web
 USER node
