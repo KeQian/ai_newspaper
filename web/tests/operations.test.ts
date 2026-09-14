@@ -93,6 +93,32 @@ describe('launch readiness', () => {
         'SECRETS_MUST_BE_DISTINCT',
       ]),
     );
+
+    const providerPlaceholders = {
+      ...input,
+      DATABASE_URL: 'postgresql://user:password@host/database?sslmode=require',
+      ADMIN_ALLOWED_EMAILS: 'editor@example.com',
+      INGESTION_TOKEN: 'replace-with-at-least-32-random-characters',
+      OPERATIONS_TOKEN: 'replace-with-a-different-32-character-secret',
+      NEWSLETTER_TOKEN_SECRET: 'replace-with-at-least-32-random-characters',
+      NEWSLETTER_FROM: 'AI Newspaper <newsletter@example.com>',
+      EMAIL_API_URL: 'https://email-provider.example/v1/messages',
+      EMAIL_API_TOKEN: 'replace-with-provider-api-token',
+      EMAIL_WEBHOOK_SECRET: 'replace-with-at-least-32-random-characters',
+    };
+    expect(checkLaunchReadiness(providerPlaceholders, now).blockers).toEqual(
+      expect.arrayContaining([
+        'DATABASE_URL_PLACEHOLDER',
+        'ADMIN_ALLOWED_EMAILS_PLACEHOLDER',
+        'INGESTION_TOKEN_PLACEHOLDER',
+        'OPERATIONS_TOKEN_PLACEHOLDER',
+        'NEWSLETTER_TOKEN_SECRET_PLACEHOLDER',
+        'NEWSLETTER_FROM_PLACEHOLDER',
+        'EMAIL_API_URL_PLACEHOLDER',
+        'EMAIL_API_TOKEN_PLACEHOLDER',
+        'EMAIL_WEBHOOK_SECRET_PLACEHOLDER',
+      ]),
+    );
   });
 });
 

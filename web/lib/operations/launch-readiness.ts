@@ -73,12 +73,23 @@ export function checkLaunchReadiness(
         (issue) => `ENV_${issue.path.join('_').toUpperCase()}`,
       );
 
-  if (containsPlaceholder(input.PUBLIC_SITE_URL))
-    blockers.push('PUBLIC_SITE_URL_PLACEHOLDER');
-  if (containsPlaceholder(input.PUBLIC_CONTACT_EMAIL))
-    blockers.push('PUBLIC_CONTACT_EMAIL_PLACEHOLDER');
-  if (containsPlaceholder(input.OIDC_ISSUER_URL))
-    blockers.push('OIDC_ISSUER_PLACEHOLDER');
+  const placeholderChecks = [
+    ['DATABASE_URL', 'DATABASE_URL_PLACEHOLDER'],
+    ['PUBLIC_SITE_URL', 'PUBLIC_SITE_URL_PLACEHOLDER'],
+    ['PUBLIC_CONTACT_EMAIL', 'PUBLIC_CONTACT_EMAIL_PLACEHOLDER'],
+    ['OIDC_ISSUER_URL', 'OIDC_ISSUER_PLACEHOLDER'],
+    ['ADMIN_ALLOWED_EMAILS', 'ADMIN_ALLOWED_EMAILS_PLACEHOLDER'],
+    ['INGESTION_TOKEN', 'INGESTION_TOKEN_PLACEHOLDER'],
+    ['OPERATIONS_TOKEN', 'OPERATIONS_TOKEN_PLACEHOLDER'],
+    ['NEWSLETTER_TOKEN_SECRET', 'NEWSLETTER_TOKEN_SECRET_PLACEHOLDER'],
+    ['NEWSLETTER_FROM', 'NEWSLETTER_FROM_PLACEHOLDER'],
+    ['EMAIL_API_URL', 'EMAIL_API_URL_PLACEHOLDER'],
+    ['EMAIL_API_TOKEN', 'EMAIL_API_TOKEN_PLACEHOLDER'],
+    ['EMAIL_WEBHOOK_SECRET', 'EMAIL_WEBHOOK_SECRET_PLACEHOLDER'],
+  ] as const;
+  for (const [key, blocker] of placeholderChecks) {
+    if (containsPlaceholder(input[key])) blockers.push(blocker);
+  }
   if (input.NEWSLETTER_PUBLIC_URL !== input.PUBLIC_SITE_URL)
     blockers.push('NEWSLETTER_PUBLIC_URL_MISMATCH');
 
@@ -112,7 +123,12 @@ export function checkLaunchReadiness(
 }
 
 function containsPlaceholder(value: string | undefined) {
-  return !value || /example\.(?:com|test)|replace-with/iu.test(value);
+  return (
+    !value ||
+    /example(?:\.(?:com|test))?|replace-with|(?:^|[/@.:])host(?:[/?:]|$)/iu.test(
+      value,
+    )
+  );
 }
 
 function checkRecent(
