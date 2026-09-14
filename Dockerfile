@@ -5,7 +5,7 @@ FROM node:22.22.0-bookworm-slim AS build
 ENV CI=true
 WORKDIR /app
 
-RUN corepack enable && corepack install --global pnpm@10.33.0
+RUN npm install --global pnpm@10.33.0
 
 COPY package.json ./package.json
 COPY web/package.json web/pnpm-lock.yaml web/.npmrc ./web/
@@ -27,7 +27,7 @@ ENV NODE_ENV=production \
     PORT=3000
 
 WORKDIR /app
-RUN corepack enable && corepack install --global pnpm@10.33.0
+RUN npm install --global pnpm@10.33.0
 
 COPY package.json ./package.json
 COPY --from=build --chown=node:node /app/web/package.json ./web/package.json
