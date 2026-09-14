@@ -1,0 +1,1 @@
+ALTER TABLE "ingestion_run_sources" ADD COLUMN "archive_object_key" text;

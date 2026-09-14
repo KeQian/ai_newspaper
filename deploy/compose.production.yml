@@ -1,0 +1,26 @@
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: ai-newspaper:${IMAGE_TAG:-local}
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      NODE_ENV: production
+      RAW_ARCHIVE_DIR: /var/lib/ai-newspaper/raw-archives
+      CANDIDATE_RESPONSE_DIR: /var/lib/ai-newspaper/candidate-responses
+    ports:
+      - 127.0.0.1:${APP_PORT:-3100}:3000
+    volumes:
+      - ./runtime/raw-archives:/var/lib/ai-newspaper/raw-archives
+      - ./runtime/candidate-responses:/var/lib/ai-newspaper/candidate-responses
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    stop_grace_period: 30s

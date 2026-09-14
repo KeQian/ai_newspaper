@@ -1,0 +1,911 @@
+openapi: 3.1.0
+info:
+  title: AI Signal API
+  version: 0.1.0
+  description: P0 public, editorial, ingestion and newsletter contract. No membership or payment endpoints.
+servers:
+  - url: /api/v1
+security: []
+paths:
+  /health:
+    get:
+      summary: Dependency-free process liveness probe
+      responses:
+        '200': { description: Process is alive }
+  /content:
+    get:
+      summary: List published content
+      parameters:
+        - { name: type, in: query, schema: { type: string, enum: [news, briefing, analysis] } }
+        - { name: topic, in: query, schema: { type: string } }
+        - { name: verification, in: query, schema: { type: string, enum: [confirmed, developing, unverified] } }
+        - { name: importanceMin, in: query, schema: { type: integer, minimum: 1, maximum: 5 } }
+        - { name: source, in: query, schema: { type: string, minLength: 1, maxLength: 120 }, description: Case-insensitive publisher name }
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+        - { name: to, in: query, schema: { type: string, format: date-time } }
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+      responses:
+        '200': { description: Published content page, content: { application/json: { schema: { $ref: '#/components/schemas/ContentPage' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /content/{slug}:
+    get:
+      summary: Get published content by slug
+      parameters:
+        - { name: slug, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Content, content: { application/json: { schema: { $ref: '#/components/schemas/Content' } } } }
+        '301': { description: Slug moved; Location header is set }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /briefings/{date}:
+    get:
+      summary: Get briefing for Asia/Shanghai calendar date
+      parameters:
+        - { name: date, in: path, required: true, schema: { type: string, format: date } }
+      responses:
+        '200': { description: Briefing, content: { application/json: { schema: { $ref: '#/components/schemas/Content' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /topics:
+    get:
+      summary: List public topics
+      responses:
+        '200': { description: Topics, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/TopicSummary' } } } } }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /topics/{slug}:
+    get:
+      summary: Get a topic and its latest content
+      parameters: [{ name: slug, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: Topic, content: { application/json: { schema: { $ref: '#/components/schemas/Topic' } } } }
+        '301': { description: Topic merged or renamed; Location header is set }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /search:
+    get:
+      summary: Search published content and topics
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string, minLength: 1, maxLength: 120 } }
+        - { name: type, in: query, schema: { type: string, enum: [news, briefing, analysis] } }
+        - { name: topic, in: query, schema: { type: string } }
+        - { name: sort, in: query, schema: { type: string, enum: [relevance, latest], default: relevance } }
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 30, default: 20 } }
+      responses:
+        '200': { description: Search results, content: { application/json: { schema: { $ref: '#/components/schemas/SearchPage' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /newsletter/subscriptions:
+    post:
+      summary: Request free newsletter subscription
+      parameters:
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, minLength: 16, maxLength: 128 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, consent]
+              properties:
+                email: { type: string, format: email, maxLength: 254 }
+                consent: { type: boolean, const: true }
+                source: { type: string, maxLength: 80 }
+      responses:
+        '202': { description: Generic accepted response; does not reveal existing status }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /newsletter/confirm:
+    post:
+      summary: Confirm subscription token
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [token], properties: { token: { type: string } } } } } }
+      responses:
+        '200': { description: Confirmed or already confirmed }
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /newsletter/unsubscribe:
+    post:
+      summary: Unsubscribe immediately
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [token], properties: { token: { type: string } } } } } }
+      responses:
+        '200': { description: Unsubscribed or already unsubscribed }
+  /admin/session:
+    get:
+      security: [{ adminSession: [] }]
+      summary: Get the current OIDC-backed admin session and roles
+      responses: { '200': { description: Current admin session, content: { application/json: { schema: { $ref: '#/components/schemas/AdminSession' } } } }, '401': { $ref: '#/components/responses/Unauthorized' } }
+    delete:
+      security: [{ adminSession: [] }]
+      summary: End the current admin session
+      responses: { '204': { description: Session ended }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/Forbidden' } }
+  /admin/candidates:
+    get:
+      security: [{ adminSession: [] }]
+      summary: List candidate events
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [new, processing, review, merged, rejected, published] } }
+        - { name: verification, in: query, schema: { type: string, enum: [confirmed, developing, unverified] } }
+        - { name: importance, in: query, schema: { type: integer, minimum: 1, maximum: 5 } }
+        - { name: risk, in: query, schema: { type: string, maxLength: 80 } }
+        - { name: source, in: query, schema: { type: string, maxLength: 120 } }
+        - { name: entity, in: query, schema: { type: string, maxLength: 120 } }
+        - { name: topic, in: query, schema: { type: string, maxLength: 120 } }
+        - { name: q, in: query, schema: { type: string, maxLength: 160 } }
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+        - { name: to, in: query, schema: { type: string, format: date-time } }
+        - { name: includeDeferred, in: query, schema: { type: boolean, default: false } }
+        - { name: sort, in: query, schema: { type: string, enum: [created_desc], default: created_desc } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+        - { name: cursor, in: query, schema: { type: string } }
+      responses: { '200': { description: Candidate page, content: { application/json: { schema: { $ref: '#/components/schemas/CandidatePage' } } } }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/Forbidden' } }
+  /admin/candidates/{id}:
+    get:
+      security: [{ adminSession: [] }]
+      summary: Get a candidate with source snapshots, entities and merge suggestions
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: Candidate review detail, content: { application/json: { schema: { $ref: '#/components/schemas/CandidateDetail' } } } }, '404': { $ref: '#/components/responses/NotFound' } }
+  /admin/candidates/{id}/decision:
+    post:
+      security: [{ adminSession: [] }]
+      summary: Create a draft, merge, reject, or defer a candidate
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action, version]
+              properties:
+                action: { type: string, enum: [create_draft, merge, reject, defer] }
+                targetId: { type: string, format: uuid }
+                reason: { type: string, minLength: 1, maxLength: 1000, description: Required for merge, reject and defer; required for create_draft only when no primary or official source exists. }
+                version: { type: integer }
+      responses: { '200': { description: Decision recorded, content: { application/json: { schema: { $ref: '#/components/schemas/MutationResult' } } } }, '409': { $ref: '#/components/responses/Conflict' } }
+  /admin/content:
+    get:
+      security: [{ adminSession: [] }]
+      summary: List content in all editorial states
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [draft, in_review, scheduled, published, updated, withdrawn] } }
+        - { name: type, in: query, schema: { type: string, enum: [news, briefing, analysis] } }
+        - { name: q, in: query, schema: { type: string, minLength: 1, maxLength: 160 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+        - { name: cursor, in: query, schema: { type: string } }
+      responses: { '200': { description: Editorial content page, content: { application/json: { schema: { $ref: '#/components/schemas/AdminContentPage' } } } }, '401': { $ref: '#/components/responses/Unauthorized' } }
+    post:
+      security: [{ adminSession: [] }]
+      summary: Create a content draft
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ContentDraftInput' } } } }
+      responses: { '201': { description: Draft created, content: { application/json: { schema: { $ref: '#/components/schemas/MutationResult' } } } }, '422': { $ref: '#/components/responses/ValidationError' } }
+  /admin/content/{id}:
+    get:
+      security: [{ adminSession: [] }]
+      summary: Get a content item with version history
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: Editorial content detail, content: { application/json: { schema: { $ref: '#/components/schemas/AdminContentDetail' } } } }, '404': { $ref: '#/components/responses/NotFound' } }
+    patch:
+      security: [{ adminSession: [] }]
+      summary: Update a content draft using optimistic locking
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody: { required: true, content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/ContentDraftInput' }, { type: object, required: [version], properties: { version: { type: integer } } }] } } } }
+      responses: { '200': { description: Draft updated }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/ValidationError' } }
+  /admin/content/{id}/submit-review:
+    post:
+      security: [{ adminSession: [] }]
+      summary: Submit a draft for chief-editor review
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/VersionInput' } } } }
+      responses: { '200': { description: Draft entered review, content: { application/json: { schema: { $ref: '#/components/schemas/MutationResult' } } } }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/ValidationError' } }
+  /admin/content/{id}/publish:
+    post:
+      security: [{ adminSession: [] }]
+      x-required-roles: [chief_editor, admin]
+      summary: Publish a reviewed content version
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [version], properties: { version: { type: integer }, scheduledAt: { type: string, format: date-time } } } } } }
+      responses: { '200': { description: Published or scheduled }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/ValidationError' } }
+  /admin/content/{id}/cancel-schedule:
+    post:
+      security: [{ adminSession: [] }]
+      x-required-roles: [chief_editor, admin]
+      summary: Cancel a schedule and return content to review
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/VersionInput' } } } }
+      responses: { '200': { description: Schedule cancelled }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/ValidationError' } }
+  /admin/content/{id}/withdraw:
+    post:
+      security: [{ adminSession: [] }]
+      x-required-roles: [chief_editor, admin]
+      summary: Withdraw published content and record a reason
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [reason, version], properties: { reason: { type: string, minLength: 1, maxLength: 1000 }, version: { type: integer } } } } } }
+      responses: { '200': { description: Content withdrawn }, '409': { $ref: '#/components/responses/Conflict' } }
+  /admin/content/{id}/corrections:
+    post:
+      security: [{ adminSession: [] }]
+      x-required-roles: [chief_editor, admin]
+      summary: Publish a corrected revision and a public correction note
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - { $ref: '#/components/schemas/ContentDraftInput' }
+                - type: object
+                  required: [version, correctionDescription]
+                  properties:
+                    version: { type: integer, minimum: 1 }
+                    correctionDescription: { type: string, minLength: 1, maxLength: 1000 }
+      responses: { '200': { description: Correction published and refresh queued }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/ValidationError' } }
+  /admin/sources:
+    get:
+      security: [{ adminSession: [] }]
+      summary: List source configuration and health
+      responses: { '200': { description: Source page, content: { application/json: { schema: { $ref: '#/components/schemas/SourceFeedPage' } } } }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/Forbidden' } }
+  /admin/sources/{id}:
+    patch:
+      security: [{ adminSession: [] }]
+      x-required-roles: [admin]
+      summary: Update source state and reviewed configuration
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [version], properties: { enabled: { type: boolean }, schedule: { type: string }, version: { type: integer } } } } } }
+      responses: { '200': { description: Source updated }, '409': { $ref: '#/components/responses/Conflict' } }
+  /admin/sources/{id}/test:
+    post:
+      security: [{ adminSession: [] }]
+      x-required-roles: [admin]
+      summary: Queue a non-publishing source test
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { '202': { description: Test queued } }
+  /admin/runs:
+    get:
+      security: [{ adminSession: [] }]
+      summary: List ingestion runs
+      parameters:
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+      responses: { '200': { description: Run page, content: { application/json: { schema: { $ref: '#/components/schemas/IngestionRunPage' } } } }, '400': { $ref: '#/components/responses/BadRequest' }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/Forbidden' } }
+  /admin/runs/{id}:
+    get:
+      security: [{ adminSession: [] }]
+      summary: Get run stages, source results and errors
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: Run detail, content: { application/json: { schema: { $ref: '#/components/schemas/IngestionRun' } } } }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /admin/runs/{id}/retry:
+    post:
+      security: [{ adminSession: [] }]
+      x-required-roles: [admin]
+      summary: Retry failed work with the original idempotency scope
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { '202': { description: Retry queued }, '409': { $ref: '#/components/responses/Conflict' } }
+  /admin/newsletters:
+    get:
+      security: [{ adminSession: [] }]
+      summary: List newsletter editions
+      responses: { '200': { description: Newsletter page, content: { application/json: { schema: { $ref: '#/components/schemas/NewsletterIssuePage' } } } } }
+    post:
+      security: [{ adminSession: [] }]
+      summary: Create a newsletter draft
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/NewsletterIssueInput' } } } }
+      responses: { '201': { description: Newsletter draft created, content: { application/json: { schema: { $ref: '#/components/schemas/NewsletterIssue' } } } }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/Forbidden' }, '422': { $ref: '#/components/responses/ValidationError' } }
+  /admin/newsletters/{id}:
+    get:
+      security: [{ adminSession: [] }]
+      summary: Get one newsletter edition for editing and preview
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: Newsletter edition, content: { application/json: { schema: { $ref: '#/components/schemas/NewsletterIssue' } } } }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+    patch:
+      security: [{ adminSession: [] }]
+      summary: Update a newsletter draft using optimistic locking
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [subject, body, version], properties: { subject: { type: string, minLength: 1, maxLength: 160 }, preheader: { type: string, maxLength: 200 }, body: { $ref: '#/components/schemas/RichTextDocument' }, contentIds: { type: array, maxItems: 50, items: { type: string, format: uuid } }, version: { type: integer, minimum: 1 } } } } } }
+      responses: { '200': { description: Newsletter updated, content: { application/json: { schema: { $ref: '#/components/schemas/NewsletterIssue' } } } }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/ValidationError' } }
+  /admin/newsletters/{id}/send-test:
+    post:
+      security: [{ adminSession: [] }]
+      summary: Send a test email to an allowed admin address
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { '202': { description: Test send queued }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '422': { $ref: '#/components/responses/ValidationError' } }
+  /admin/newsletters/{id}/send:
+    post:
+      security: [{ adminSession: [] }]
+      x-required-roles: [chief_editor, admin]
+      summary: Queue an approved newsletter edition exactly once
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, minLength: 16, maxLength: 128 } }
+      responses: { '202': { description: Send queued }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/ValidationError' } }
+  /admin/entities:
+    get:
+      security: [{ adminSession: [] }]
+      summary: List entities, aliases and merge suggestions
+      responses: { '200': { description: Entity page, content: { application/json: { schema: { $ref: '#/components/schemas/AdminEntityPage' } } } } }
+  /admin/entities/{id}:
+    patch:
+      security: [{ adminSession: [] }]
+      summary: Update canonical entity metadata using optimistic locking
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [version], properties: { name: { type: string }, description: { type: string }, website: { type: string, format: uri }, aliases: { type: array, items: { type: string } }, version: { type: integer } } } } } }
+      responses: { '200': { description: Entity updated }, '409': { $ref: '#/components/responses/Conflict' } }
+  /admin/entities/{id}/merge:
+    post:
+      security: [{ adminSession: [] }]
+      summary: Merge an entity into a canonical entity
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [targetId, reason], properties: { targetId: { type: string, format: uuid }, reason: { type: string, minLength: 1, maxLength: 1000 } } } } } }
+      responses: { '200': { description: Entity merged and references repointed }, '409': { $ref: '#/components/responses/Conflict' } }
+  /admin/audit:
+    get:
+      security: [{ adminSession: [] }]
+      x-required-roles: [admin]
+      summary: Query immutable audit records
+      parameters:
+        - { name: action, in: query, schema: { type: string, maxLength: 160 } }
+        - { name: objectType, in: query, schema: { type: string, maxLength: 120 } }
+        - { name: actorId, in: query, schema: { type: string, format: uuid } }
+        - { name: requestId, in: query, schema: { type: string, maxLength: 200 } }
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+        - { name: to, in: query, schema: { type: string, format: date-time } }
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+      responses: { '200': { description: Redacted audit page, content: { application/json: { schema: { $ref: '#/components/schemas/AuditPage' } } } }, '400': { $ref: '#/components/responses/BadRequest' }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/Forbidden' }, '503': { $ref: '#/components/responses/Unavailable' } }
+  /webhooks/email/{provider}:
+    post:
+      summary: Receive signed delivery, bounce, complaint and unsubscribe events
+      x-authentication: Provider-specific timestamped signature over the raw request body
+      parameters: [{ name: provider, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, additionalProperties: true } } } }
+      responses: { '204': { description: Event accepted or already processed }, '400': { $ref: '#/components/responses/BadRequest' }, '401': { $ref: '#/components/responses/Unauthorized' }, '503': { $ref: '#/components/responses/Unavailable' } }
+  /internal/ingestion/runs:
+    post:
+      security: [{ ingestionToken: [] }]
+      summary: Create or resume an ingestion run
+      parameters: [{ name: Idempotency-Key, in: header, required: true, description: 'jobKey:scheduledAtUtc:sha256(sorted unique source keys joined by newline)', schema: { type: string, minLength: 80, maxLength: 300 } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/IngestionRunInput' } } } }
+      responses: { '202': { description: New or existing run accepted, content: { application/json: { schema: { $ref: '#/components/schemas/IngestionRunAccepted' } } } }, '400': { $ref: '#/components/responses/BadRequest' }, '401': { $ref: '#/components/responses/Unauthorized' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/ValidationError' } }
+  /internal/operations/status:
+    get:
+      security: [{ operationsToken: [] }]
+      summary: Read a no-PII operations snapshot and evaluated alerts
+      responses:
+        '200': { description: Operations snapshot, content: { application/json: { schema: { $ref: '#/components/schemas/OperationsStatus' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+components:
+  securitySchemes:
+    adminSession: { type: apiKey, in: cookie, name: admin_session, description: Opaque server-side session token; Secure, HttpOnly and SameSite=Strict in production. }
+    ingestionToken: { type: http, scheme: bearer }
+    operationsToken: { type: http, scheme: bearer }
+  schemas:
+    MutationResult:
+      type: object
+      required: [id, status]
+      properties:
+        id: { type: string }
+        status: { type: string }
+        version: { type: integer }
+        requestId: { type: string }
+    VersionInput:
+      type: object
+      additionalProperties: false
+      required: [version]
+      properties:
+        version: { type: integer, minimum: 1 }
+    AdminSession:
+      type: object
+      required: [adminId, email, roles, expiresAt]
+      properties:
+        adminId: { type: string, format: uuid }
+        email: { type: string, format: email }
+        displayName: { type: string }
+        roles: { type: array, items: { type: string, enum: [editor, chief_editor, admin] } }
+        expiresAt: { type: string, format: date-time }
+    Candidate:
+      type: object
+      required: [id, title, factSummary, status, verification, importance, confidence, sourceCount, createdAt, version]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        factSummary: { type: string }
+        status: { type: string, enum: [new, processing, review, merged, rejected, published] }
+        verification: { type: string, enum: [confirmed, developing, unverified] }
+        importance: { type: integer, minimum: 1, maximum: 5 }
+        confidence: { type: number, minimum: 0, maximum: 1 }
+        sourceCount: { type: integer, minimum: 1 }
+        riskFlags: { type: array, items: { type: string } }
+        primarySource: { type: [string, 'null'] }
+        deferredUntil: { type: [string, 'null'], format: date-time }
+        createdAt: { type: string, format: date-time }
+        version: { type: integer }
+    CandidateDetail:
+      allOf:
+        - { $ref: '#/components/schemas/Candidate' }
+        - type: object
+          required: [documents, entities, entitySuggestions, mergeSuggestions, novelty, actionability]
+          properties:
+            novelty: { type: integer, minimum: 1, maximum: 5 }
+            actionability: { type: integer, minimum: 1, maximum: 5 }
+            modelInfo: { type: [object, 'null'], additionalProperties: true }
+            documents: { type: array, minItems: 1, items: { type: object, additionalProperties: true } }
+            entities: { type: array, items: { type: object, additionalProperties: true } }
+            entitySuggestions: { type: array, items: { type: object, additionalProperties: true } }
+            mergeSuggestions: { type: array, items: { type: object, additionalProperties: true } }
+    CandidatePage:
+      type: object
+      required: [items, hasMore]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Candidate' } }
+        nextCursor: { type: [string, 'null'] }
+        hasMore: { type: boolean }
+    AdminContentSummary:
+      type: object
+      required: [id, type, title, status, authorName, updatedAt, sourceHealth, version]
+      properties:
+        id: { type: string, format: uuid }
+        type: { type: string, enum: [news, briefing, analysis] }
+        title: { type: string }
+        status: { type: string, enum: [draft, in_review, scheduled, published, updated, withdrawn] }
+        authorName: { type: string }
+        updatedAt: { type: string, format: date-time }
+        scheduledAt: { type: [string, 'null'], format: date-time }
+        publishedAt: { type: [string, 'null'], format: date-time }
+        sourceHealth: { type: string, enum: [healthy, warning, missing] }
+        version: { type: integer }
+    AdminContentDetail:
+      allOf:
+        - { $ref: '#/components/schemas/AdminContentSummary' }
+        - type: object
+          required: [slug, dek, summary, body, verification, importance, actionability, seo, sources, topicIds, revisions, corrections]
+          properties:
+            slug: { type: string }
+            dek: { type: string }
+            summary: { type: string }
+            body: { $ref: '#/components/schemas/RichTextDocument' }
+            verification: { type: string, enum: [confirmed, developing, unverified] }
+            importance: { type: integer, minimum: 1, maximum: 5 }
+            actionability: { type: integer, minimum: 1, maximum: 5 }
+            seo: { type: object, additionalProperties: true }
+            aiDisclosure: { type: [object, 'null'], additionalProperties: true }
+            withdrawalReason: { type: [string, 'null'] }
+            sources: { type: array, items: { type: object, additionalProperties: true } }
+            topicIds: { type: array, items: { type: string, format: uuid } }
+            revisions: { type: array, items: { type: object, additionalProperties: true } }
+            corrections: { type: array, items: { type: object, additionalProperties: true } }
+    AdminContentPage:
+      type: object
+      required: [items, hasMore]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/AdminContentSummary' } }
+        nextCursor: { type: [string, 'null'] }
+        hasMore: { type: boolean }
+    SourceFeed:
+      type: object
+      required: [id, key, name, sourceType, reliability, enabled, termsStatus, schedule, failureCount, healthStatus, version]
+      properties:
+        id: { type: string, format: uuid }
+        key: { type: string }
+        name: { type: string }
+        sourceType: { type: string }
+        reliability: { type: string, enum: [s0, s1, s2, s3, s4] }
+        enabled: { type: boolean }
+        termsStatus: { type: string, enum: [approved, review, restricted] }
+        schedule: { type: string }
+        lastSuccessAt: { type: [string, 'null'], format: date-time }
+        failureCount: { type: integer, minimum: 0 }
+        healthStatus: { type: string, enum: [healthy, degraded, failing, stale, unknown] }
+        version: { type: integer }
+    SourceFeedPage:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/SourceFeed' } }
+    IngestionRun:
+      type: object
+      required: [id, jobKey, status, scheduledAt, fetchedCount, newCount, duplicateCount, errorCount]
+      properties:
+        id: { type: string, format: uuid }
+        jobKey: { type: string }
+        status: { type: string, enum: [queued, running, partial, succeeded, failed, cancelled] }
+        scheduledAt: { type: string, format: date-time }
+        startedAt: { type: [string, 'null'], format: date-time }
+        finishedAt: { type: [string, 'null'], format: date-time }
+        fetchedCount: { type: integer, minimum: 0 }
+        newCount: { type: integer, minimum: 0 }
+        duplicateCount: { type: integer, minimum: 0 }
+        errorCount: { type: integer, minimum: 0 }
+        sourceResults: { type: array, items: { type: object, additionalProperties: true } }
+    IngestionRunPage:
+      type: object
+      required: [items, hasMore]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/IngestionRun' } }
+        nextCursor: { type: [string, 'null'] }
+        hasMore: { type: boolean }
+    NewsletterIssueSummary:
+      type: object
+      required: [id, issueDate, subject, status]
+      properties:
+        id: { type: string, format: uuid }
+        issueDate: { type: string, format: date }
+        subject: { type: string }
+        status: { type: string, enum: [draft, scheduled, sending, sent, failed, cancelled] }
+        scheduledAt: { type: [string, 'null'], format: date-time }
+        sentAt: { type: [string, 'null'], format: date-time }
+        version: { type: integer }
+        queuedCount: { type: integer, minimum: 0 }
+        deliveredCount: { type: integer, minimum: 0 }
+        bouncedCount: { type: integer, minimum: 0 }
+        complainedCount: { type: integer, minimum: 0 }
+        unsubscribedCount: { type: integer, minimum: 0 }
+    NewsletterIssueInput:
+      type: object
+      additionalProperties: false
+      required: [issueDate, subject, body]
+      properties:
+        issueDate: { type: string, format: date }
+        subject: { type: string, minLength: 1, maxLength: 160 }
+        preheader: { type: string, maxLength: 200 }
+        body: { $ref: '#/components/schemas/RichTextDocument' }
+        contentIds: { type: array, maxItems: 50, items: { type: string, format: uuid } }
+    NewsletterIssue:
+      allOf:
+        - { $ref: '#/components/schemas/NewsletterIssueSummary' }
+        - type: object
+          required: [preheader, body, contentIds, queuedCount, deliveredCount, bouncedCount, complainedCount, unsubscribedCount]
+          properties:
+            preheader: { type: string }
+            body: { $ref: '#/components/schemas/RichTextDocument' }
+            contentIds: { type: array, items: { type: string, format: uuid } }
+            queuedCount: { type: integer, minimum: 0 }
+            deliveredCount: { type: integer, minimum: 0 }
+            bouncedCount: { type: integer, minimum: 0 }
+            complainedCount: { type: integer, minimum: 0 }
+            unsubscribedCount: { type: integer, minimum: 0 }
+    NewsletterIssuePage:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/NewsletterIssueSummary' } }
+    AdminEntity:
+      type: object
+      required: [id, entityType, slug, canonicalName, status, aliases, version]
+      properties:
+        id: { type: string, format: uuid }
+        entityType: { type: string, enum: [company, product, model, person, topic] }
+        slug: { type: string }
+        canonicalName: { type: string }
+        status: { type: string }
+        aliases: { type: array, items: { type: string } }
+        version: { type: integer }
+    AdminEntityPage:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/AdminEntity' } }
+    AuditRecord:
+      type: object
+      required: [id, action, objectType, objectId, requestId, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        actorId: { type: [string, 'null'], format: uuid }
+        actorName: { type: [string, 'null'] }
+        action: { type: string }
+        objectType: { type: string }
+        objectId: { type: string }
+        requestId: { type: string }
+        before: { type: [object, 'null'], additionalProperties: true, description: Sensitive fields are redacted. }
+        after: { type: [object, 'null'], additionalProperties: true, description: Sensitive fields are redacted. }
+        createdAt: { type: string, format: date-time }
+    AuditPage:
+      type: object
+      required: [items, hasMore]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/AuditRecord' } }
+        nextCursor: { type: [string, 'null'] }
+        hasMore: { type: boolean }
+    OperationsStatus:
+      type: object
+      required: [checkedAt, databaseReady, ingestion, sources, outbox, newsletter, alerts, requestId]
+      properties:
+        checkedAt: { type: string, format: date-time }
+        databaseReady: { type: boolean }
+        ingestion: { type: object, additionalProperties: { type: integer } }
+        sources: { type: object, additionalProperties: { type: integer } }
+        outbox: { type: object, additionalProperties: true }
+        newsletter: { type: object, additionalProperties: { type: integer } }
+        alerts: { type: array, items: { type: object, additionalProperties: true } }
+        requestId: { type: string }
+    Source:
+      type: object
+      required: [id, title, publisher, url, sourceType, reliability, relation, accessedAt]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        publisher: { type: string }
+        url: { type: string, format: uri }
+        sourceType: { type: string, enum: [api, rss, atom, web, github, manual] }
+        reliability: { type: string, enum: [s0, s1, s2, s3, s4] }
+        relation: { type: string, enum: [primary, corroborating, signal] }
+        publishedAt: { type: [string, 'null'], format: date-time }
+        accessedAt: { type: string, format: date-time }
+    PublicContentSummary:
+      type: object
+      required: [id, type, slug, title, dek, summary, status, verification, importance, actionability, authorName, publishedAt, updatedAt, aiDisclosure, seo, topics, sourceCount]
+      properties:
+        id: { type: string, format: uuid }
+        type: { type: string, enum: [news, briefing, analysis] }
+        slug: { type: string }
+        title: { type: string }
+        dek: { type: string }
+        summary: { type: string }
+        status: { type: string, enum: [published, updated, withdrawn] }
+        verification: { type: string, enum: [confirmed, developing, unverified] }
+        importance: { type: integer, minimum: 1, maximum: 5 }
+        actionability: { type: integer, minimum: 1, maximum: 5 }
+        authorName: { type: string }
+        publishedAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        aiDisclosure: { type: [object, 'null'], additionalProperties: true }
+        seo: { type: object, additionalProperties: true }
+        topics: { type: array, items: { $ref: '#/components/schemas/TopicSummary' } }
+        sourceCount: { type: integer, minimum: 0 }
+    Content:
+      allOf:
+        - { $ref: '#/components/schemas/PublicContentSummary' }
+        - type: object
+          required: [body, sources, corrections]
+          properties:
+            body: { $ref: '#/components/schemas/RichTextDocument' }
+            sources: { type: array, items: { $ref: '#/components/schemas/Source' } }
+            corrections:
+              type: array
+              items:
+                type: object
+                required: [description, correctedAt]
+                properties:
+                  description: { type: string }
+                  correctedAt: { type: string, format: date-time }
+    TopicSummary:
+      type: object
+      required: [id, slug, name, description, contentCount, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        name: { type: string }
+        description: { type: string }
+        contentCount: { type: integer, minimum: 0 }
+        updatedAt: { type: string, format: date-time }
+    Topic:
+      allOf:
+        - { $ref: '#/components/schemas/TopicSummary' }
+        - type: object
+          required: [description, latestContent]
+          properties:
+            description: { type: string }
+            latestContent: { $ref: '#/components/schemas/ContentPage' }
+    EntitySummary:
+      type: object
+      required: [slug, name, entityType]
+      properties:
+        slug: { type: string }
+        name: { type: string }
+        entityType: { type: string, enum: [company, product, model, person, organization] }
+    Entity:
+      allOf:
+        - { $ref: '#/components/schemas/EntitySummary' }
+        - type: object
+          required: [description, latestContent]
+          properties:
+            description: { type: string }
+            website: { type: string, format: uri }
+            latestContent: { $ref: '#/components/schemas/ContentPage' }
+    ContentDraftInput:
+      type: object
+      additionalProperties: false
+      required: [type, title, summary, body, verification, importance, actionability, sourceIds, topicIds, seo, aiDisclosure, changeSummary]
+      properties:
+        type: { type: string, enum: [news, briefing, analysis] }
+        title: { type: string, minLength: 1, maxLength: 160 }
+        dek: { type: string, maxLength: 280 }
+        summary: { type: string, minLength: 1, maxLength: 1000 }
+        body: { $ref: '#/components/schemas/RichTextDocument' }
+        verification: { type: string, enum: [confirmed, developing, unverified] }
+        importance: { type: integer, minimum: 1, maximum: 5 }
+        actionability: { type: integer, minimum: 1, maximum: 5 }
+        sourceIds: { type: array, minItems: 1, items: { type: string, format: uuid } }
+        topicIds: { type: array, items: { type: string, format: uuid } }
+        seo:
+          type: object
+          additionalProperties: false
+          required: [title, description]
+          properties:
+            title: { type: string, minLength: 1, maxLength: 160 }
+            description: { type: string, minLength: 1, maxLength: 300 }
+        aiDisclosure:
+          type: object
+          additionalProperties: false
+          required: [assisted, note]
+          properties:
+            assisted: { type: boolean }
+            note: { type: string, maxLength: 1000 }
+        changeSummary: { type: string, minLength: 1, maxLength: 300 }
+    RichTextDocument:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, type, content]
+      properties:
+        schemaVersion: { type: integer, const: 1 }
+        type: { type: string, const: doc }
+        content: { type: array, items: { $ref: '#/components/schemas/RichTextBlock' } }
+    RichTextBlock:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [type, content]
+          properties:
+            type: { type: string, enum: [paragraph, blockquote] }
+            content: { type: array, items: { $ref: '#/components/schemas/RichTextInline' } }
+        - type: object
+          additionalProperties: false
+          required: [type, level, content]
+          properties:
+            type: { type: string, const: heading }
+            level: { type: integer, minimum: 2, maximum: 4 }
+            content: { type: array, items: { $ref: '#/components/schemas/RichTextInline' } }
+        - type: object
+          additionalProperties: false
+          required: [type, items]
+          properties:
+            type: { type: string, enum: [bulletList, orderedList] }
+            items: { type: array, items: { type: array, items: { $ref: '#/components/schemas/RichTextBlock' } } }
+        - type: object
+          additionalProperties: false
+          required: [type, mediaId, alt]
+          properties:
+            type: { type: string, const: image }
+            mediaId: { type: string, format: uuid }
+            alt: { type: string, maxLength: 300 }
+            caption: { type: string, maxLength: 500 }
+            credit: { type: string, maxLength: 300 }
+        - type: object
+          additionalProperties: false
+          required: [type, headers, rows]
+          properties:
+            type: { type: string, const: table }
+            caption: { type: string, maxLength: 300 }
+            headers:
+              type: array
+              minItems: 1
+              maxItems: 12
+              items: { type: string, maxLength: 300 }
+            rows:
+              type: array
+              maxItems: 200
+              items:
+                type: array
+                items: { type: string, maxLength: 2000 }
+        - type: object
+          additionalProperties: false
+          required: [type, tone, content]
+          properties:
+            type: { type: string, const: callout }
+            tone: { type: string, enum: [note, warning] }
+            title: { type: string, maxLength: 160 }
+            content: { type: array, items: { $ref: '#/components/schemas/RichTextInline' } }
+        - type: object
+          additionalProperties: false
+          required: [type, title, summary, data]
+          properties:
+            type: { type: string, const: chart }
+            title: { type: string, minLength: 1, maxLength: 160 }
+            summary: { type: string, minLength: 1, maxLength: 500 }
+            unit: { type: string, maxLength: 40 }
+            data:
+              type: array
+              minItems: 1
+              maxItems: 50
+              items:
+                type: object
+                additionalProperties: false
+                required: [label, value]
+                properties:
+                  label: { type: string, maxLength: 160 }
+                  value: { type: number }
+        - type: object
+          additionalProperties: false
+          required: [type, items]
+          properties:
+            type: { type: string, const: footnotes }
+            items:
+              type: array
+              minItems: 1
+              maxItems: 100
+              items:
+                type: object
+                additionalProperties: false
+                required: [id, text]
+                properties:
+                  id: { type: string, maxLength: 40 }
+                  text: { type: string, maxLength: 2000 }
+    RichTextInline:
+      type: object
+      additionalProperties: false
+      required: [type, text]
+      properties:
+        type: { type: string, const: text }
+        text: { type: string }
+        marks:
+          type: array
+          items:
+            oneOf:
+              - { type: object, additionalProperties: false, required: [type], properties: { type: { type: string, enum: [strong, emphasis, code] } } }
+              - { type: object, additionalProperties: false, required: [type, href], properties: { type: { type: string, const: link }, href: { type: string, format: uri } } }
+              - { type: object, additionalProperties: false, required: [type, sourceId], properties: { type: { type: string, const: citation }, sourceId: { type: string, format: uuid } } }
+    ContentPage:
+      type: object
+      required: [items, nextCursor, hasMore]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/PublicContentSummary' } }
+        nextCursor: { type: [string, 'null'] }
+        hasMore: { type: boolean }
+    SearchPage:
+      type: object
+      required: [query, items, topics, totalApprox, nextCursor, hasMore]
+      properties:
+        query: { type: string }
+        items: { type: array, items: { $ref: '#/components/schemas/SearchResult' } }
+        topics: { type: array, items: { $ref: '#/components/schemas/TopicSummary' } }
+        totalApprox: { type: integer, minimum: 0 }
+        nextCursor: { type: [string, 'null'] }
+        hasMore: { type: boolean }
+    SearchResult:
+      allOf:
+        - { $ref: '#/components/schemas/PublicContentSummary' }
+        - type: object
+          required: [snippet, matchField, score]
+          properties:
+            snippet: { type: string }
+            matchField: { type: string, enum: [title, summary, body, entity] }
+            score: { type: number }
+    IngestionRunInput:
+      type: object
+      required: [jobKey, scheduledAt, sources]
+      properties:
+        jobKey: { type: string }
+        scheduledAt: { type: string, format: date-time }
+        sources: { type: array, minItems: 1, items: { type: string } }
+        cursor: { type: object, additionalProperties: true }
+    IngestionRunAccepted:
+      type: object
+      required: [id, status, idempotencyKey, reused, requestId]
+      properties:
+        id: { type: string, format: uuid }
+        status: { type: string, enum: [queued, running, partial, succeeded, failed, cancelled] }
+        idempotencyKey: { type: string }
+        reused: { type: boolean }
+        requestId: { type: string }
+    Error:
+      type: object
+      required: [code, message, requestId]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        requestId: { type: string }
+        fieldErrors: { type: object, additionalProperties: { type: array, items: { type: string } } }
+  responses:
+    BadRequest: { description: Invalid request, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Unauthorized: { description: Authentication required, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Forbidden: { description: Insufficient role, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    NotFound: { description: Resource not found, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Unavailable: { description: Service temporarily unavailable, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Conflict: { description: Idempotency or optimistic-lock conflict, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    ValidationError: { description: Business validation failed, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    RateLimited: { description: Rate limit exceeded; Retry-After is set, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }

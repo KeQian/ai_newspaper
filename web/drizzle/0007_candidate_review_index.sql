@@ -1,0 +1,1 @@
+CREATE INDEX "candidate_events_review_queue_idx" ON "candidate_events" USING btree ("status","deferred_until","created_at");

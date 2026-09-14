@@ -1,0 +1,313 @@
+version: 1
+defaults:
+  timezone: Asia/Shanghai
+  user_agent: AI-Signal-Research/0.1 (+contact@example.com)
+  respect_robots: true
+  max_document_bytes: 2097152
+  request_timeout_seconds: 20
+  retry: { attempts: 3, strategy: exponential, max_delay_seconds: 300 }
+sources:
+  - id: github-openai-python-releases
+    name: OpenAI Python SDK Releases
+    organization: OpenAI
+    category: developer_ecosystem
+    source_type: github
+    reliability: s0
+    endpoint: https://api.github.com/repos/openai/openai-python/releases
+    parser: github_releases_v1
+    schedule: hourly
+    auth_env: GITHUB_TOKEN
+    retention: metadata_and_excerpt
+    terms_status: approved_api
+    publication_policy: candidate_only
+    enabled: true
+    owner: editorial
+  - id: github-openai-node-releases
+    name: OpenAI Node SDK Releases
+    organization: OpenAI
+    category: developer_ecosystem
+    source_type: github
+    reliability: s0
+    endpoint: https://api.github.com/repos/openai/openai-node/releases
+    parser: github_releases_v1
+    schedule: hourly
+    auth_env: GITHUB_TOKEN
+    retention: metadata_and_excerpt
+    terms_status: approved_api
+    publication_policy: candidate_only
+    enabled: false
+    owner: editorial
+  - id: github-openai-agents-python-releases
+    name: OpenAI Agents Python Releases
+    organization: OpenAI
+    category: developer_ecosystem
+    source_type: github
+    reliability: s0
+    endpoint: https://api.github.com/repos/openai/openai-agents-python/releases
+    parser: github_releases_v1
+    schedule: hourly
+    auth_env: GITHUB_TOKEN
+    retention: metadata_and_excerpt
+    terms_status: approved_api
+    publication_policy: candidate_only
+    enabled: false
+    owner: editorial
+  - id: github-anthropic-python-releases
+    name: Anthropic Python SDK Releases
+    organization: Anthropic
+    category: developer_ecosystem
+    source_type: github
+    reliability: s0
+    endpoint: https://api.github.com/repos/anthropics/anthropic-sdk-python/releases
+    parser: github_releases_v1
+    schedule: hourly
+    auth_env: GITHUB_TOKEN
+    retention: metadata_and_excerpt
+    terms_status: approved_api
+    publication_policy: candidate_only
+    enabled: false
+    owner: editorial
+  - id: github-google-genai-python-releases
+    name: Google Gen AI Python SDK Releases
+    organization: Google
+    category: developer_ecosystem
+    source_type: github
+    reliability: s0
+    endpoint: https://api.github.com/repos/googleapis/python-genai/releases
+    parser: github_releases_v1
+    schedule: hourly
+    auth_env: GITHUB_TOKEN
+    retention: metadata_and_excerpt
+    terms_status: approved_api
+    publication_policy: candidate_only
+    enabled: false
+    owner: editorial
+  - id: github-transformers-releases
+    name: Transformers Releases
+    organization: Hugging Face
+    category: open_models
+    source_type: github
+    reliability: s0
+    endpoint: https://api.github.com/repos/huggingface/transformers/releases
+    parser: github_releases_v1
+    schedule: hourly
+    auth_env: GITHUB_TOKEN
+    retention: metadata_and_excerpt
+    terms_status: approved_api
+    publication_policy: candidate_only
+    enabled: false
+    owner: research
+  - id: github-vllm-releases
+    name: vLLM Releases
+    organization: vLLM Project
+    category: developer_ecosystem
+    source_type: github
+    reliability: s0
+    endpoint: https://api.github.com/repos/vllm-project/vllm/releases
+    parser: github_releases_v1
+    schedule: every_2_hours
+    auth_env: GITHUB_TOKEN
+    retention: metadata_and_excerpt
+    terms_status: approved_api
+    publication_policy: candidate_only
+    enabled: false
+    owner: research
+  - id: github-ollama-releases
+    name: Ollama Releases
+    organization: Ollama
+    category: developer_ecosystem
+    source_type: github
+    reliability: s0
+    endpoint: https://api.github.com/repos/ollama/ollama/releases
+    parser: github_releases_v1
+    schedule: every_2_hours
+    auth_env: GITHUB_TOKEN
+    retention: metadata_and_excerpt
+    terms_status: approved_api
+    publication_policy: candidate_only
+    enabled: false
+    owner: editorial
+  - id: github-langchain-releases
+    name: LangChain Releases
+    organization: LangChain
+    category: developer_ecosystem
+    source_type: github
+    reliability: s0
+    endpoint: https://api.github.com/repos/langchain-ai/langchain/releases
+    parser: github_releases_v1
+    schedule: every_2_hours
+    auth_env: GITHUB_TOKEN
+    retention: metadata_and_excerpt
+    terms_status: approved_api
+    publication_policy: candidate_only
+    enabled: false
+    owner: editorial
+  - id: github-vercel-ai-releases
+    name: Vercel AI SDK Releases
+    organization: Vercel
+    category: developer_ecosystem
+    source_type: github
+    reliability: s0
+    endpoint: https://api.github.com/repos/vercel/ai/releases
+    parser: github_releases_v1
+    schedule: every_2_hours
+    auth_env: GITHUB_TOKEN
+    retention: metadata_and_excerpt
+    terms_status: approved_api
+    publication_policy: candidate_only
+    enabled: false
+    owner: editorial
+  - id: github-semantic-kernel-releases
+    name: Semantic Kernel Releases
+    organization: Microsoft
+    category: developer_ecosystem
+    source_type: github
+    reliability: s0
+    endpoint: https://api.github.com/repos/microsoft/semantic-kernel/releases
+    parser: github_releases_v1
+    schedule: every_2_hours
+    auth_env: GITHUB_TOKEN
+    retention: metadata_and_excerpt
+    terms_status: approved_api
+    publication_policy: candidate_only
+    enabled: false
+    owner: editorial
+  - id: github-llama-index-releases
+    name: LlamaIndex Releases
+    organization: LlamaIndex
+    category: developer_ecosystem
+    source_type: github
+    reliability: s0
+    endpoint: https://api.github.com/repos/run-llama/llama_index/releases
+    parser: github_releases_v1
+    schedule: every_2_hours
+    auth_env: GITHUB_TOKEN
+    retention: metadata_and_excerpt
+    terms_status: approved_api
+    publication_policy: candidate_only
+    enabled: false
+    owner: editorial
+  - id: github-mcp-specification-releases
+    name: Model Context Protocol Specification Releases
+    organization: Model Context Protocol
+    category: standards
+    source_type: github
+    reliability: s0
+    endpoint: https://api.github.com/repos/modelcontextprotocol/specification/releases
+    parser: github_releases_v1
+    schedule: every_2_hours
+    auth_env: GITHUB_TOKEN
+    retention: metadata_and_excerpt
+    terms_status: approved_api
+    publication_policy: candidate_only
+    enabled: false
+    owner: research
+  - id: huggingface-models
+    name: Hugging Face model updates
+    organization: Hugging Face
+    category: open_models
+    source_type: api
+    reliability: s0
+    endpoint: https://huggingface.co/api/models
+    parser: huggingface_models_v1
+    schedule: every_2_hours
+    auth_env: HUGGINGFACE_TOKEN
+    retention: metadata_and_excerpt
+    terms_status: review_before_launch
+    publication_policy: candidate_only
+    enabled: false
+    owner: editorial
+  - id: arxiv-ai
+    name: arXiv AI query
+    organization: arXiv
+    category: research
+    source_type: atom
+    reliability: s0
+    endpoint: https://export.arxiv.org/api/query
+    query: '(cat:cs.AI OR cat:cs.CL OR cat:cs.LG)'
+    parser: arxiv_atom_v1
+    schedule: daily_0500
+    retention: metadata_and_abstract
+    terms_status: review_before_launch
+    publication_policy: candidate_only
+    enabled: false
+    owner: research
+  - id: hacker-news
+    name: Hacker News top and new stories
+    organization: Y Combinator
+    category: community_signal
+    source_type: api
+    reliability: s3
+    endpoint: https://hacker-news.firebaseio.com/v0
+    parser: hacker_news_v1
+    schedule: hourly
+    retention: metadata_and_excerpt
+    terms_status: review_before_launch
+    publication_policy: discovery_only
+    enabled: false
+    owner: editorial
+  - id: sec-edgar-ai-watchlist
+    name: SEC EDGAR AI company watchlist
+    organization: U.S. SEC
+    category: company_disclosure
+    source_type: api
+    reliability: s0
+    endpoint: https://data.sec.gov/submissions/
+    parser: sec_submissions_v1
+    schedule: every_2_hours
+    retention: metadata_and_excerpt
+    terms_status: approved_api_with_fair_access
+    publication_policy: candidate_only
+    enabled: false
+    owner: business
+  - id: anthropic-release-notes
+    name: Claude Platform release notes
+    organization: Anthropic
+    category: model_platform
+    source_type: web
+    reliability: s1
+    endpoint: https://platform.claude.com/docs/en/release-notes/overview
+    parser: semantic_article_index_v1
+    schedule: hourly
+    retention: metadata_and_excerpt
+    terms_status: review_before_launch
+    publication_policy: candidate_only
+    enabled: false
+    owner: editorial
+  - id: google-gemini-changelog
+    name: Gemini API release notes
+    organization: Google
+    category: model_platform
+    source_type: web
+    reliability: s1
+    endpoint: https://ai.google.dev/gemini-api/docs/changelog
+    parser: semantic_changelog_v1
+    schedule: hourly
+    retention: metadata_and_excerpt
+    terms_status: review_before_launch
+    publication_policy: candidate_only
+    enabled: false
+    owner: editorial
+  - id: deepseek-news
+    name: DeepSeek Research and News
+    organization: DeepSeek
+    category: model_platform
+    source_type: web
+    reliability: s1
+    endpoint: https://deepseek.com/en/news/
+    parser: semantic_article_index_v1
+    schedule: hourly
+    retention: metadata_and_excerpt
+    terms_status: review_before_launch
+    publication_policy: candidate_only
+    enabled: false
+    owner: editorial
+restricted_sources:
+  - { id: product-hunt, reason: commercial API use requires permission }
+  - { id: reddit, reason: commercial use may require a separate agreement }
+  - { id: login_walled_social, reason: "do not bypass login, anti-bot, or access controls" }
+notes:
+  - Replace contact@example.com before any production request.
+  - Add exact company repositories, SEC CIK values, domestic official sources, and parser fixtures before enabling those sources.
+  - A source with terms_status review_before_launch must remain disabled in production until approved.
+  - GitHub Releases, Hugging Face Models, and arXiv Atom connector implementations have fixture, request-policy, cursor, archive, and batch-isolation coverage; disabled sources remain disabled until terms review and launch configuration are complete.

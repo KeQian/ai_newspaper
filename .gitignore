@@ -1,0 +1,16 @@
+.DS_Store
+/pnpm-lock.yaml
+.env
+.env.local
+deploy/.env.production
+deploy/runtime/
+node_modules/
+.pnpm-store/
+web/node_modules/
+web/.next/
+web/.vinext/
+web/dist/
+web/coverage/
+web/playwright-report/
+web/test-results/
+web/.wrangler/

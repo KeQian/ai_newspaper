@@ -1,0 +1,2 @@
+ALTER TABLE "newsletter_issues" ADD COLUMN "send_idempotency_key_hash" text;--> statement-breakpoint
+CREATE UNIQUE INDEX "newsletter_issues_send_idempotency_uidx" ON "newsletter_issues" USING btree ("send_idempotency_key_hash") WHERE "newsletter_issues"."send_idempotency_key_hash" is not null;
