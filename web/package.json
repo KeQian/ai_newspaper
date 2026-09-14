@@ -45,6 +45,7 @@
     "embla-carousel-react": "8.5.2",
     "input-otp": "1.4.2",
     "lucide-react": "1.31.0",
+    "pg": "8.16.3",
     "react": "19.2.8",
     "react-day-picker": "9.8.1",
     "react-dom": "19.2.8",
@@ -67,6 +68,7 @@
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@types/node": "22.19.19",
+    "@types/pg": "8.15.5",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.2",
@@ -85,5 +87,6 @@
     "vitest": "^5.0.0",
     "wrangler": "4.130.0"
   },
-  "type": "module"
+  "type": "module",
+  "packageManager": "pnpm@10.33.0+sha512.10568bb4a6afb58c9eb3630da90cc9516417abebd3fabbe6739f0ae795728da1491e9db5a544c76ad8eb7570f5c4bb3d6c637b2cb41bfdcdb47fa823c8649319"
 }

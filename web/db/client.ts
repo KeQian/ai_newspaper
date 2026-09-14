@@ -1,17 +1,28 @@
-import { neon, neonConfig } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-http';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import pg from 'pg';
+
+const pools = new Map<string, pg.Pool>();
 
 export function createDatabase(databaseUrl: string) {
   if (!databaseUrl) {
     throw new Error('DATABASE_URL is required');
   }
 
-  neonConfig.fetchConnectionCache = true;
-  const client = neon(databaseUrl);
-  // Repositories use explicit table objects and do not use Drizzle's relational
-  // `database.query` API. Omitting the full schema here keeps the shared client
-  // type small and prevents recursive type expansion as projections are added.
-  return drizzle({ client });
+  let pool = pools.get(databaseUrl);
+  if (!pool) {
+    pool = new pg.Pool({
+      connectionString: databaseUrl,
+      max: 5,
+      connectionTimeoutMillis: 5000,
+      idleTimeoutMillis: 10000,
+      allowExitOnIdle: true,
+    });
+    pool.on('error', () =>
+      console.error(JSON.stringify({ event: 'database.pool_error' })),
+    );
+    pools.set(databaseUrl, pool);
+  }
+  return drizzle({ client: pool });
 }
 
 export type Database = ReturnType<typeof createDatabase>;
